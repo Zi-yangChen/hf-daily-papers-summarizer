@@ -105,7 +105,7 @@ def fetch_github_trending():
 
 def fetch_hf_trending_models():
     # 抓取前 20 趋势模型
-    url = "https://huggingface.co/api/models?sort=trending&limit=20"
+    url = "https://huggingface.co/api/models?sort=trendingScore&direction=-1&limit=20"
     try:
         response = requests.get(url, timeout=15)
         response.raise_for_status()
@@ -126,7 +126,7 @@ def fetch_hf_trending_models():
 
 def fetch_hf_trending_spaces():
     # 抓取前 20 趋势 Space 应用
-    url = "https://huggingface.co/api/spaces?sort=trending&limit=20"
+    url = "https://huggingface.co/api/spaces?sort=trendingScore&direction=-1&limit=20"
     try:
         response = requests.get(url, timeout=15)
         response.raise_for_status()
