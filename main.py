@@ -266,7 +266,7 @@ def run_task(client, task_name, fetch_func, prompt_func, folder_name, file_prefi
         # 调用 Gemini (Free Tier 默认限额 15 RPM，一分钟最多 15 次调用)
         print(f"✨ 正在向 Gemini 提交分析请求...")
         response = client.models.generate_content(
-            model='gemini-1.5-flash',
+            model='gemini-3.5-flash',
             contents=prompt,
         )
         
