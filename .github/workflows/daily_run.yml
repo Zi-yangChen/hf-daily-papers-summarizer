@@ -3,7 +3,7 @@ name: Multi-Task Daily AI Summary
 on:
   schedule:
     # 每天北京时间早上 9:00 (UTC 1:00) 定时执行
-    - cron: '14 2 * * *'
+    - cron: '23 2 * * *'
   workflow_dispatch: # 保留手动触发用于验证和调试
 
 permissions:
