@@ -2,6 +2,7 @@ import os
 import time
 import datetime
 import json
+import random  # 新增导入，用于计算随机抖动
 import requests
 from bs4 import BeautifulSoup
 from google import genai
@@ -228,7 +229,7 @@ def get_prompt_spaces(data):
        - **[Space 名称与作者]** (链接: https://huggingface.co/spaces/{{id}})
        - **核心 SDK 技术栈** (如 Gradio, Streamlit, Docker)
        - **功能亮点与底层技术解析**：用 5-8 句话详细解析该应用演示了什么功能，它可能是如何与底层大模型/算法交互实现的。
-       - **复现或二次开发价值**：普通开发者或产品研究者可以从中借鉴什么思路、如何将其集成到自己的商业流。
+       - **复现或二次开发价值**：普通开发者或产品研究者可以从中借鉴什么思路、如何将其集成 to自己的商业流。
        
     以下是数据：
     {json.dumps(data, ensure_ascii=False, indent=2)}
@@ -245,6 +246,36 @@ def save_markdown_report(folder, prefix, content):
         f.write(content)
     print(f"成功保存报告到: {filepath}")
 
+def generate_content_with_retry(client, model, contents, max_retries=6, initial_delay=15, backoff_factor=2):
+    """
+    带重试机制的 API 请求封装函数。
+    支持指数退避和随机抖动，主要针对 503 (高负载) 和 429 (频率超限) 错误。
+    """
+    delay = initial_delay
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=model,
+                contents=contents,
+            )
+            return response
+        except Exception as e:
+            err_msg = str(e)
+            print(f"⚠️ API 调用失败 (尝试 {attempt}/{max_retries}): {err_msg}")
+            
+            # 如果达到了最大重试次数，则向外抛出异常
+            if attempt == max_retries:
+                raise e
+            
+            # 生成随机抖动系数 (在 0.8 到 1.2 之间)，避免多个请求产生共振
+            jitter = random.uniform(0.8, 1.2)
+            sleep_time = delay * jitter
+            print(f"⏳ 服务忙/受限，等待 {sleep_time:.1f} 秒后重试...")
+            time.sleep(sleep_time)
+            
+            # 指数级增加下一次等待的时长
+            delay *= backoff_factor
+
 def run_task(client, task_name, fetch_func, prompt_func, folder_name, file_prefix):
     print(f"\n🚀 开始执行任务: {task_name}")
     try:
@@ -257,11 +288,15 @@ def run_task(client, task_name, fetch_func, prompt_func, folder_name, file_prefi
         # 组装 Prompt
         prompt = prompt_func(data)
         
-        # 调用 Gemini (Free Tier 默认限额 15 RPM，一分钟最多 15 次调用)
+        # 调用 Gemini (使用带指数退避和重试机制的方法)
         print(f"✨ 正在向 Gemini 提交分析请求...")
-        response = client.models.generate_content(
+        response = generate_content_with_retry(
+            client=client,
             model='gemini-3.5-flash',
             contents=prompt,
+            max_retries=6,       # 最大重试 6 次
+            initial_delay=15,    # 首次等待 15 秒（由于 503 通常需要多等一会）
+            backoff_factor=2     # 每次失败后等待时间翻倍
         )
         
         # 保存 Markdown
