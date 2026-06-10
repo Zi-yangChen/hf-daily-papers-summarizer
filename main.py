@@ -4,7 +4,7 @@ import datetime
 from google import genai
 
 from config import TASKS
-from src.utils import generate_content_with_retry, save_markdown_report
+from src.utils import save_markdown_report
 
 # 获取当前的北京时间日期 (配合 YAML 中设置的 Asia/Shanghai 时区)
 today = datetime.date.today().strftime("%Y-%m-%d")
@@ -22,15 +22,11 @@ def run_task(client, task):
         # 2. 组装 Prompt
         prompt = task["prompt"](data, today)
         
-        # 3. 调用 Gemini (带重试机制)
+        # 3. 单次调用 Gemini (无重试机制，若失败则直接触发 Exception 逻辑)
         print(f"✨ 正在向 Gemini 提交分析请求...")
-        response = generate_content_with_retry(
-            client=client,
+        response = client.models.generate_content(
             model='gemini-3.5-flash',
             contents=prompt,
-            max_retries=6,
-            initial_delay=15,
-            backoff_factor=2
         )
         
         # 4. 保存 Markdown 报告
@@ -38,11 +34,12 @@ def run_task(client, task):
         print(f"✅ 任务 {task_name} 执行完毕！")
         
     except Exception as e:
+        # 如果 API 提交或数据抓取失败，在此捕获，不会中断整个 main.py 循环
         print(f"❌ 任务 {task_name} 运行中发生错误: {e}")
     
-    # 💤 强制休眠 30 秒，确保单次 Actions 周期中不会触碰 15 RPM 的免费层频率限制
-    print("⏳ 等待 30 秒以规避 API 频控上限...")
-    time.sleep(30)
+    # 💤 无论成功还是失败，每个任务提交间隔 5 分钟 (300 秒)
+    print("⏳ 等待 5 分钟以符合任务提交间隔要求...")
+    time.sleep(300)
 
 def main():
     api_key = os.environ.get("GEMINI_API_KEY")
